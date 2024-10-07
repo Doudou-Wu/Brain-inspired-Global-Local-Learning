@@ -1,0 +1,2 @@
+Namespace(T=4, device='cuda:0', b=128, epochs=64, j=8, data_dir='/data', out_dir='./logs', resume=None, amp=True, cupy=True, opt='sgd', momentum=0.9, lr=0.1, channels=128, save_es=None)
+D:\Projects\Brain-inspired-Global-Local-Learning\main.py -T 4 -device cuda:0 -b 128 -epochs 64 -data-dir /data -amp -cupy -opt sgd -lr 0.1 -j 8
