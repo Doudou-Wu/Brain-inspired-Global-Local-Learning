@@ -19,28 +19,33 @@ import datetime
 from spikingjelly import visualizing
 
 class CSNN(nn.Module):
-    def __init__(self, T: int, channels: int, use_cupy=False):
+    def __init__(self, T: int, use_cupy=False):
         super().__init__()
         self.T = T
 
         self.conv_fc = nn.Sequential(
-        layer.Conv2d(1, channels, kernel_size=3, padding=1, bias=False),
-        layer.BatchNorm2d(channels),
-        neuron.IFNode(surrogate_function=surrogate.ATan()),
-        layer.MaxPool2d(2, 2),  # 14 * 14
+                layer.Conv2d(1, 128, kernel_size=3, padding=1, bias=False),
+                layer.BatchNorm2d(128), #28 * 28
+                neuron.IFNode(surrogate_function=surrogate.ATan()),
+                layer.MaxPool2d(2, 2),  #14 * 14
 
-        layer.Conv2d(channels, channels, kernel_size=3, padding=1, bias=False),
-        layer.BatchNorm2d(channels),
-        neuron.IFNode(surrogate_function=surrogate.ATan()),
-        layer.MaxPool2d(2, 2),  # 7 * 7
+                layer.Conv2d(128, 256, kernel_size=3, padding=1, bias=False),
+                layer.BatchNorm2d(256), #14 * 14
+                neuron.IFNode(surrogate_function=surrogate.ATan()),
+                layer.MaxPool2d(2, 2),  #7 * 7
 
-        layer.Flatten(),
-        layer.Linear(channels * 7 * 7, channels * 4 * 4, bias=False),
-        neuron.IFNode(surrogate_function=surrogate.ATan()),
+                layer.Conv2d(256, 256, kernel_size=3, padding=1, bias=False),
+                layer.BatchNorm2d(256), #7 * 7
+                neuron.IFNode(surrogate_function=surrogate.ATan()),
+                layer.MaxPool2d(2, 2),  #3 * 3
 
-        layer.Linear(channels * 4 * 4, 10, bias=False),
-        neuron.IFNode(surrogate_function=surrogate.ATan()),
-        )
+                layer.Flatten(), # 256 * 3 * 3 = 2304
+                layer.Linear(256 * 3 * 3, 512, bias=False),
+                neuron.IFNode(surrogate_function=surrogate.ATan()),
+
+                layer.Linear(512, 10, bias=False),
+                neuron.IFNode(surrogate_function=surrogate.ATan()),
+                )
 
         functional.set_step_mode(self, step_mode='m')
 
@@ -103,7 +108,7 @@ def main():
     args = parser.parse_args()
     print(args)
 
-    net = CSNN(T=args.T, channels=args.channels, use_cupy=args.cupy)
+    net = CSNN(T=args.T, use_cupy=args.cupy)
 
     print(net)
 
