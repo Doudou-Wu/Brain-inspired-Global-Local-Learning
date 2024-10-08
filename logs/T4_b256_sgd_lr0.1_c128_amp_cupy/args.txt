@@ -1,0 +1,2 @@
+<__main__.Args object at 0x7ac10f6193c0>
+/usr/local/lib/python3.10/dist-packages/colab_kernel_launcher.py -f /root/.local/share/jupyter/runtime/kernel-52be0324-def1-4398-a140-d1339364785b.json
