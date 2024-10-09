@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 import os
 import time
 import argparse
-from torch.cuda import amp
+from torch import amp
 import sys
 import datetime
 from spikingjelly import visualizing
