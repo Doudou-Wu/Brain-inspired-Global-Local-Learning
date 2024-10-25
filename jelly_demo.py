@@ -34,6 +34,7 @@ class HebbianLIFNeuron(neuron.BaseNode):
         self.gamma = gamma
         self.eta = eta
         self.register_buffer('hebb', torch.zeros(size, dtype=torch.float32))
+        self.register_buffer('spike', torch.zeros(size, dtype=torch.float32))
         self.reset()
         
     def reset(self):
@@ -45,7 +46,9 @@ class HebbianLIFNeuron(neuron.BaseNode):
             
         hebb_term = self.alpha * self.hebb.unsqueeze(0)
         # 使用新变量存储计算结果，避免inplace操作
-        new_v = self.v * decay + x + hebb_term
+        # new_v = self.v * decay + x + hebb_term 
+        #上面是hard reset
+        new_v = (self.v - self.spike * thresh) * decay + x + hebb_term
         self.v = new_v
 
     def neuronal_fire(self):
@@ -53,7 +56,7 @@ class HebbianLIFNeuron(neuron.BaseNode):
 
     def update_hebb(self, x):
         with torch.no_grad():  # Hebbian更新不需要计算梯度
-            v_normalized = (self.v/thresh) - self.eta
+            v_normalized = ((self.v/thresh) - self.eta).tanh()
             delta_hebb = torch.mean(v_normalized, dim=0)
             new_hebb = w_decay * self.hebb + self.beta * delta_hebb
             self.hebb = torch.clamp(new_hebb, -4, 4)
@@ -157,9 +160,10 @@ def train(model, train_loader, test_loader):
                 correct += predicted.eq(labels).sum().item()
                 
         acc = 100. * correct / total
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss:.5f}, '
+        print(f'Epoch [{epoch+1}/{num_epochs}], Step {i+1/len(train_loader)//batch_size}, Loss: {running_loss:.5f}, '
               f'Test Accuracy: {acc:.2f}%')
         print(f'Running time: {time.time() - start_time:.2f}s')
+    
 
 def main():
     setup_seed(111)
