@@ -26,25 +26,27 @@ lp_learning_rate = 5e-4
 gp_learning_rate = 1e-3
 
 class HebbianLIFNeuron(neuron.BaseNode):
-    def __init__(self, size, alpha, beta, gamma, eta, surrogate_function=surrogate.ATan()):
+    def __init__(self, input_size, output_size, alpha, beta, gamma, eta, surrogate_function=surrogate.ATan()):
         super().__init__(surrogate_function=surrogate_function)
-        self.size = size
+        self.input_size = input_size
+        self.output_size = output_size
         self.alpha = alpha
         self.beta = beta  
         self.gamma = gamma
         self.eta = eta
-        self.register_buffer('hebb', torch.zeros(size, dtype=torch.float32))
-        self.register_buffer('spike', torch.zeros(size, dtype=torch.float32))
+        self.register_buffer('hebb', torch.zeros(output_size, output_size, dtype=torch.float32)) #define size
+        self.register_buffer('spike', torch.zeros(batch_size, output_size, dtype=torch.float32))
         self.reset()
         
     def reset(self):
         self.v = 0.0
         
     def neuronal_charge(self, x: torch.Tensor):
+        batch_size = x.shape[0]
         if isinstance(self.v, float):
-            self.v = torch.zeros_like(x)
+            self.v = torch.zeros(batch_size, self.output_size, device=x.device)
             
-        hebb_term = self.alpha * self.hebb.unsqueeze(0)
+        hebb_term = self.alpha * x.mm(self.hebb)
         # 使用新变量存储计算结果，避免inplace操作
         # new_v = self.v * decay + x + hebb_term 
         #上面是hard reset
@@ -56,12 +58,19 @@ class HebbianLIFNeuron(neuron.BaseNode):
 
     def update_hebb(self, x):
         with torch.no_grad():  # Hebbian更新不需要计算梯度
-            v_normalized = ((self.v/thresh) - self.eta).tanh()
-            delta_hebb = torch.mean(v_normalized, dim=0)
-            new_hebb = w_decay * self.hebb + self.beta * delta_hebb
+            v_normalized = ((self.v/thresh) - self.eta.unsqueeze(0)).tanh()
+            x_beta = x * self.beta
+            delta_hebb = torch.bmm(x_beta.unsqueeze(2), v_normalized.unsqueeze(1))
+            delta_hebb = torch.mean(delta_hebb, dim=0)
+            new_hebb = w_decay * self.hebb + delta_hebb
             self.hebb = torch.clamp(new_hebb, -4, 4)
 
     def forward(self, x):
+        # if x.dim() != 2:
+        #     raise ValueError(f"Expected 2D input, got {x.dim()}D")
+        # if x.size(1) != self.input_size:
+        #     raise ValueError(f"Expected input size {self.input_size}, got {x.size(1)}")
+        
         self.neuronal_charge(x)
         spike = self.neuronal_fire()
         self.update_hebb(x)
@@ -70,8 +79,11 @@ class HebbianLIFNeuron(neuron.BaseNode):
 class HebbianSNN(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = layer.Linear(28*28, cfg_fc[0])
-        self.fc2 = layer.Linear(cfg_fc[0], cfg_fc[1])
+        self.input_size = 28*28
+        self.hidden_size = cfg_fc[0]
+        self.output_size = cfg_fc[1]
+        self.fc1 = layer.Linear(28*28, cfg_fc[0]) # 784 512
+        self.fc2 = layer.Linear(cfg_fc[0], cfg_fc[1]) # 512 10
         
         self.alpha1 = nn.Parameter(torch.rand(1) * 1e-2)
         self.alpha2 = nn.Parameter(torch.rand(1) * 1e-2)
@@ -82,9 +94,9 @@ class HebbianSNN(nn.Module):
         self.eta1 = nn.Parameter(torch.rand(cfg_fc[0]) * 1e-2)
         self.eta2 = nn.Parameter(torch.rand(cfg_fc[1]) * 1e-2)
         
-        self.lif1 = HebbianLIFNeuron(cfg_fc[0], self.alpha1, self.beta1, 
+        self.lif1 = HebbianLIFNeuron(28*28, cfg_fc[0], self.alpha1, self.beta1, 
                                     self.gamma1, self.eta1)
-        self.lif2 = HebbianLIFNeuron(cfg_fc[1], self.alpha2, self.beta2, 
+        self.lif2 = HebbianLIFNeuron(cfg_fc[0], cfg_fc[1], self.alpha2, self.beta2, 
                                     self.gamma2, self.eta2)
     
     def reset(self):
